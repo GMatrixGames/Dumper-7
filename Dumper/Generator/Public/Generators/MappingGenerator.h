@@ -13,9 +13,11 @@
 * uint16 magic;
 * uint8 version;                                           // Latest = PropertyFlags (6)
 * if (version >= PackageVersioning)
-*     int32 bHasVersioning;                                // this dumper always writes 0
-*     if (bHasVersioning)
-*         [FEngineVersion + FileVersionUE4/UE5 + CustomVersions + NetCL]  // not written
+*     int32 bHasVersioning;
+*     if (bHasVersioning) 
+*         if (version >= EngineVersioning)
+*             FEngineVersion EngineVersion;
+*         [FileVersionUE4/UE5 + CustomVersions + NetCL]
 * uint8 CompressionMethod;
 * uint32 CompressedSize;
 * uint32 DecompressedSize;
@@ -31,8 +33,10 @@
 * uint32 EnumCount;
 * for (int i = 0; i < EnumCount; i++)
 *     int32 EnumNameIdx;
-*     uint8 NumNamesInEnum;
+*     [uint8|uint16] NumNamesInEnum;              // u8 if version < LargeEnums, else u16
 *     for (int j = 0; j < NumNamesInEnum; j++)
+*         if (version >= ExplicitEnumValues)
+*             uint64 EnumMemberValue;
 *         int32 EnumMemberNameIdx;
 * 
 * if (version >= PropertyFlags)
