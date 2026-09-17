@@ -11,14 +11,12 @@
 * USMAP-Header:
 * 
 * uint16 magic;
-* uint8 version;
-* if (version >= Packaging)
-*     int32 bHasVersionInfo;
-*     if (bHasVersionInfo)
-*         int32 FileVersionUE4;
-*         int32 FileVersionUE5;
-*         uint32 NetCL;
-* uint8 CompressionMethode;
+* uint8 version;                                           // Latest = PropertyFlags (6)
+* if (version >= PackageVersioning)
+*     int32 bHasVersioning;                                // this dumper always writes 0
+*     if (bHasVersioning)
+*         [FEngineVersion + FileVersionUE4/UE5 + CustomVersions + NetCL]  // not written
+* uint8 CompressionMethod;
 * uint32 CompressedSize;
 * uint32 DecompressedSize;
 * 
@@ -36,6 +34,10 @@
 *     uint8 NumNamesInEnum;
 *     for (int j = 0; j < NumNamesInEnum; j++)
 *         int32 EnumMemberNameIdx;
+* 
+* if (version >= PropertyFlags)
+*     uint32 FlagDictCount;
+*     uint64 FlagDict[FlagDictCount];                      // unique EPropertyFlags, first-seen order
 * 
 * uint32 StructCount;
 * for (int i = 0; i < StructCount; i++)
@@ -57,7 +59,9 @@
 *             CALL ParsePropertyType;
 *         else if (MappingsTypeEnum == MapProperty)
 *             CALL ParsePropertyType;
-*             CALL ParsePropertyType;                       // <-- END ParsePropertyType, END ParsePropertyInfo, END ParseStruct
+*             CALL ParsePropertyType;                       // <-- END ParsePropertyType
+*         if (version >= PropertyFlags)
+*             [uint8|uint16] FlagIndex;                    // u8 if FlagDictCount <= 255, else u16
 */
 
 class MappingGenerator
@@ -83,12 +87,19 @@ private:
         /* Adds support for explicit enum values */
         ExplicitEnumValues,
 
-        Latest,
+        /* Adds support for engine versioning information */
+        EngineVersioning,
+
+        /* Adds a file-level EPropertyFlags dictionary and per-property FlagIndex */
+        PropertyFlags,
+
         LatestPlusOne,
+        Latest = LatestPlusOne - 1,
     };
 
 private:
     static constexpr uint16 UsmapFileMagic = 0x30C4;
+    static constexpr EUsmapVersion WrittenVersion = EUsmapVersion::Latest;
 
 private:
     static inline uint64 NameCounter = 0x0;
@@ -121,6 +132,13 @@ private:
     static int32 AddNameToData(std::stringstream& NameTable, const std::string& Name);
 
 private:
+    static bool ShouldExcludeEditorOnlyProperties();
+    static bool ShouldWriteMappingProperty(const PropertyWrapper& Property);
+
+    static void CollectPropertyFlags(const StructWrapper& Struct);
+    static void CollectAllPropertyFlags();
+    static void WriteFlagDictionary(std::stringstream& OutData);
+
     static void GeneratePropertyType(UEProperty Property, std::stringstream& Data, std::stringstream& NameTable);
     static void GeneratePropertyInfo(const PropertyWrapper& Property, std::stringstream& Data, std::stringstream& NameTable, int32& Index);
 
